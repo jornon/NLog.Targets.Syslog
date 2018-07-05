@@ -12,17 +12,10 @@ namespace NLog.Targets.Syslog.MessageSend
 {
     internal class Udp : MessageTransmitter
     {
-        private readonly int connectionCheckTimeout;
         private UdpClient udp;
-
-        protected override bool Ready
-        {
-            get { return udp?.Client?.IsConnected(connectionCheckTimeout) == true; }
-        }
 
         public Udp(UdpConfig udpConfig) : base(udpConfig.Server, udpConfig.Port, udpConfig.ReconnectInterval)
         {
-            connectionCheckTimeout = udpConfig.ConnectionCheckTimeout;
         }
 
         protected override Task Init()

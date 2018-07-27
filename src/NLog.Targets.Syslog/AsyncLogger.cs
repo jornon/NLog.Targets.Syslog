@@ -24,6 +24,8 @@ namespace NLog.Targets.Syslog
         private readonly BlockingCollection<AsyncLogEventInfo> queue;
         private readonly ByteArray buffer;
         private readonly MessageTransmitter messageTransmitter;
+        private TaskCompletionSource<object> flushTcs;
+        private volatile bool flush;
 
         public AsyncLogger(Layout loggingLayout, EnforcementConfig enforcementConfig, MessageBuilder messageBuilder, MessageTransmitterConfig messageTransmitterConfig)
         {
@@ -40,6 +42,13 @@ namespace NLog.Targets.Syslog
         public void Log(AsyncLogEventInfo asyncLogEvent)
         {
             throttling.Apply(queue.Count, timeout => Enqueue(asyncLogEvent, timeout));
+        }
+
+        public Task FlushAsync()
+        {
+            Interlocked.Exchange(ref flushTcs, new TaskCompletionSource<object>());
+            flush = true;
+            return flushTcs.Task;
         }
 
         private BlockingCollection<AsyncLogEventInfo> NewBlockingCollection()
@@ -68,6 +77,11 @@ namespace NLog.Targets.Syslog
 
             try
             {
+                if (flush && queue.Count == 0)
+                {
+                    flush = false;
+                    flushTcs.SetResult(null);
+                }
                 var asyncLogEventInfo = queue.Take(token);
                 var logEventMsgSet = new LogEventMsgSet(asyncLogEventInfo, buffer, messageBuilder, messageTransmitter);
 
